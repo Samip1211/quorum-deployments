@@ -63,7 +63,7 @@ spec:
         image: jpmorganchase/quorum
         imagePullPolicy: IfNotPresent
         command: ["start.sh"]
-        args: ["--bootnode=enode://973504942e8260307a1442046241e5dfc6a55a3065e3ce25d1a00b40315e127b62ba435237c7133b1d11940f1a8aadfea6c54766f337718b5d78ac26c20f4283@10.96.0.1:3031", "--ibft" , "--blockperiod=5", " --roundchangetimer=15000", "--networkid", "2018"]
+        args: ["--bootnode=enode://973504942e8260307a1442046241e5dfc6a55a3065e3ce25d1a00b40315e127b62ba435237c7133b1d11940f1a8aadfea6c54766f337718b5d78ac26c20f4283@boot-node-service:3031", "--ibft" , "--blockperiod=5", " --roundchangetimer=15000", "--networkid", "2018"]
         resources:
           limits:
             memory: "1Gi"
