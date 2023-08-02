@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: my-local-pv-1
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi  # Replace with the desired storage size
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /qdata1
+    type: Directory
+  persistentVolumeReclaimPolicy: Delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-local-pvc-1
+  namespace: kl-quorum
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi  # Replace with the desired storage size, should match the PV size
+  volumeName: my-local-pv-1
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: quorum-service
+spec:
+  selector:
+    app: quorum
+  ports:
+    - name: rpc-port
+      port: 8545
+      targetPort: 8545
+    - name: ws-port
+      port: 8546
+      targetPort: 8546
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: quorum
+  namespace: kl-quorum
+spec:
+  serviceName: ""
+  replicas: 2
+  selector:
+    matchLabels:
+      app: quorum
+  template:
+    metadata:
+      labels:
+        app: quorum
+    spec:
+      containers:
+      - name: quorum
+        image: jpmorganchase/quorum
+        imagePullPolicy: IfNotPresent
+        command: ["start.sh"]
+        args: ["--bootnode=enode://973504942e8260307a1442046241e5dfc6a55a3065e3ce25d1a00b40315e127b62ba435237c7133b1d11940f1a8aadfea6c54766f337718b5d78ac26c20f4283@10.96.0.1:3031", "--ibft" , "--blockperiod=5", " --roundchangetimer=15000", "--networkid", "2018"]
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: qdata
+          mountPath: /qdata
+      volumes:
+      - name: qdata
+        persistentVolumeClaim:
+          claimName: my-local-pvc-1
