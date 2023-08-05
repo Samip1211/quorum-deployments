@@ -28,28 +28,57 @@ spec:
   volumeName: my-local-pv-1
 ---
 apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: my-local-pv-2
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi  # Replace with the desired storage size
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /qdata2
+    type: Directory
+  persistentVolumeReclaimPolicy: Delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-local-pvc-2
+  namespace: kl-quorum
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi  # Replace with the desired storage size, should match the PV size
+  volumeName: my-local-pv-2
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: quorum-service
+  namespace: kl-quorum
 spec:
   selector:
     app: quorum
   ports:
     - name: rpc-port
       port: 8545
-      targetPort: 8545
+      targetPort: 22001
     - name: ws-port
       port: 8546
-      targetPort: 8546
+      targetPort: 23001
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
-  name: quorum
+  name: quorum-1
   namespace: kl-quorum
 spec:
-  serviceName: ""
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: quorum
@@ -63,15 +92,58 @@ spec:
         image: jpmorganchase/quorum
         imagePullPolicy: IfNotPresent
         command: ["start.sh"]
+        ports:
+        - name: rpc-port
+          containerPort: 8545
+        - name: ws-port
+          containerPort: 8546
         args: ["--bootnode=enode://973504942e8260307a1442046241e5dfc6a55a3065e3ce25d1a00b40315e127b62ba435237c7133b1d11940f1a8aadfea6c54766f337718b5d78ac26c20f4283@boot-node-service:3031", "--ibft" , "--blockperiod=5", " --roundchangetimer=15000", "--networkid", "2018"]
         resources:
           limits:
             memory: "1Gi"
             cpu: "2000m"
         volumeMounts:
-        - name: qdata
+        - name: qdata1
           mountPath: /qdata
       volumes:
-      - name: qdata
+      - name: qdata1
         persistentVolumeClaim:
           claimName: my-local-pvc-1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quorum-2
+  namespace: kl-quorum
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: quorum
+  template:
+    metadata:
+      labels:
+        app: quorum
+    spec:
+      containers:
+      - name: quorum
+        image: jpmorganchase/quorum
+        imagePullPolicy: IfNotPresent
+        command: ["start.sh"]
+        ports:
+        - name: rpc-port
+          containerPort: 8545
+        - name: ws-port
+          containerPort: 8546
+        args: ["--bootnode=enode://973504942e8260307a1442046241e5dfc6a55a3065e3ce25d1a00b40315e127b62ba435237c7133b1d11940f1a8aadfea6c54766f337718b5d78ac26c20f4283@boot-node-service:3031", "--ibft" , "--blockperiod=5", " --roundchangetimer=15000", "--networkid", "2018"]
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "2000m"
+        volumeMounts:
+        - name: qdata2
+          mountPath: /qdata
+      volumes:
+      - name: qdata2
+        persistentVolumeClaim:
+          claimName: my-local-pvc-2

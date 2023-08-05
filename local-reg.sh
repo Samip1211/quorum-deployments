@@ -23,6 +23,11 @@ kind create cluster --config=./kind/image.yaml
 # Load quorum image
 kind load docker-image jpmorganchase/quorum --name kind
 
+# Load Racecourse image
+kind load docker-image racecourse --name kind
+# Load Controller Image.
+kind load docker-image controller --name kind
+
 # 3. Add the registry config to the nodes
 #
 # This is necessary because localhost resolves to loopback addresses that are
