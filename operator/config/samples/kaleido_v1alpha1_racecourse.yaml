@@ -9,5 +9,5 @@ metadata:
     app.kubernetes.io/created-by: operator
   name: racecourse-sample
 spec:
-  replicas: 2
+  replicas: 1
   image: "racecourse" 

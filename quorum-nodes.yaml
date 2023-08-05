@@ -66,11 +66,11 @@ spec:
     app: quorum
   ports:
     - name: rpc-port
-      port: 8545
-      targetPort: 22001
+      port: 22001
+      targetPort: 8545
     - name: ws-port
-      port: 8546
-      targetPort: 23001
+      port: 23001
+      targetPort: 8546
 ---
 apiVersion: apps/v1
 kind: Deployment
