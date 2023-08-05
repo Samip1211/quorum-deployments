@@ -1,0 +1,42 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: race
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: racecourse
+  namespace: race
+spec:
+  selector:
+    app: racecourse
+  ports:
+  - port: 3000
+    targetPort: 3000
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: racecourse
+  namespace: race
+spec:
+  selector:
+    matchLabels:
+      app: racecourse
+  template:
+    metadata:
+      labels:
+        app: racecourse
+    spec:
+      containers:
+      - name: race
+        image: racecourse:latest
+        imagePullPolicy: Never
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 3000
