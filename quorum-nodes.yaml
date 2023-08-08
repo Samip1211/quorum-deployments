@@ -1,4 +1,66 @@
 apiVersion: v1
+kind: Namespace
+metadata:
+  name: kl-quorum
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: boot-node-key
+  namespace: kl-quorum
+data:
+  nodekey: "a8a535aeca0652612445543e79b6975c7470edbe8fc4ec9921dc6eeccdc7200d"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: boot-node-service
+  namespace: kl-quorum
+spec:
+  selector:
+    app: boot-node
+  ports:
+  - port: 3031
+    targetPort: 3031
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: boot-node
+  namespace: kl-quorum
+spec:
+  selector:
+    matchLabels:
+      app: boot-node
+  template:
+    metadata:
+      labels:
+        app: boot-node
+    spec:
+      containers:
+      - name: bootnode
+        image: jpmorganchase/quorum
+        imagePullPolicy: Never
+        command: ["bootnode"] 
+        args: ["-nodekey", "/qdata/nodekey"] 
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+        - containerPort: 3031
+        volumeMounts:
+        - mountPath: /qdata/nodekey
+          subPath: nodekey
+          name: qdata-0
+      volumes:
+      - name: qdata-0
+        configMap: 
+          name: boot-node-key
+---
+apiVersion: v1
 kind: PersistentVolume
 metadata:
   name: my-local-pv-1
@@ -55,6 +117,35 @@ spec:
     requests:
       storage: 1Gi  # Replace with the desired storage size, should match the PV size
   volumeName: my-local-pv-2
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: my-local-pv-3
+spec:
+  storageClassName: ""
+  capacity:
+    storage: 1Gi  # Replace with the desired storage size
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /qdata3
+    type: Directory
+  persistentVolumeReclaimPolicy: Delete
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: my-local-pvc-3
+  namespace: kl-quorum
+spec:
+  storageClassName: ""
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi  # Replace with the desired storage size, should match the PV size
+  volumeName: my-local-pv-3
 ---
 apiVersion: v1
 kind: Service
@@ -139,7 +230,7 @@ spec:
         resources:
           limits:
             memory: "1Gi"
-            cpu: "2000m"
+            cpu: "1000m"
         volumeMounts:
         - name: qdata2
           mountPath: /qdata
@@ -147,3 +238,41 @@ spec:
       - name: qdata2
         persistentVolumeClaim:
           claimName: my-local-pvc-2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: quorum-3
+  namespace: kl-quorum
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: quorum
+  template:
+    metadata:
+      labels:
+        app: quorum
+    spec:
+      containers:
+      - name: quorum
+        image: jpmorganchase/quorum
+        imagePullPolicy: IfNotPresent
+        command: ["start.sh"]
+        ports:
+        - name: rpc-port
+          containerPort: 8545
+        - name: ws-port
+          containerPort: 8546
+        args: ["--bootnode=enode://973504942e8260307a1442046241e5dfc6a55a3065e3ce25d1a00b40315e127b62ba435237c7133b1d11940f1a8aadfea6c54766f337718b5d78ac26c20f4283@boot-node-service:3031", "--ibft" , "--blockperiod=5", " --roundchangetimer=15000", "--networkid", "2018"]
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        volumeMounts:
+        - name: qdata3
+          mountPath: /qdata
+      volumes:
+      - name: qdata3
+        persistentVolumeClaim:
+          claimName: my-local-pvc-3

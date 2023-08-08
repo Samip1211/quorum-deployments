@@ -8,7 +8,10 @@ nodes:
     propagation: HostToContainer
   - hostPath: /Users/samip/Documents/kl/quorum-tools/examples/qdata_2/
     containerPath: /qdata2
-    propagation: HostToContainer 
+    propagation: HostToContainer
+  - hostPath: /Users/samip/Documents/kl/quorum-tools/examples/qdata_3/
+    containerPath: /qdata3
+    propagation: HostToContainer
 ---
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
