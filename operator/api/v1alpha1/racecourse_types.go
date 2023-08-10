@@ -36,6 +36,7 @@ type RacecourseStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	DeploymentStatus string `json:"deploymentStatus"`
+	Replicas         int    `json:"replicas"`
 }
 
 //+kubebuilder:object:root=true

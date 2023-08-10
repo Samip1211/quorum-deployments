@@ -62,8 +62,11 @@ spec:
                   of cluster Important: Run "make" to regenerate code after modifying
                   this file'
                 type: string
+              replicas:
+                type: integer
             required:
             - deploymentStatus
+            - replicas
             type: object
         type: object
     served: true

@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	appsv1 "k8s.io/api/apps/v1"
 	v1 "k8s.io/api/core/v1"
@@ -41,6 +42,11 @@ type RacecourseReconciler struct {
 	client.Client
 	Scheme *runtime.Scheme
 }
+
+var (
+	DeploymentStatusWaiting = "Waiting"
+	DeploymentStatusTrue    = "True"
+)
 
 //+kubebuilder:rbac:groups=kaleido.kaleido.com,resources=racecourses,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=kaleido.kaleido.com,resources=racecourses/status,verbs=get;update;patch
@@ -68,44 +74,47 @@ func (r *RacecourseReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	namespace = req.Namespace
 
-	// if raceObj.Status.DeploymentStatus == "True" {
-	// 	return ctrl.Result{}, nil
-	// }
+	fmt.Println("Here...", raceObj.Spec.Replicas)
+	r.reconcileRaceCourseService()
 
-	// Reconcile the Deployment.
-	if raceObj.Status.DeploymentStatus == "" {
-		err = r.reconcileRaceCourseDeployment(*raceObj)
-		if err != nil {
-			if apierrors.IsAlreadyExists(err) {
-				return ctrl.Result{}, nil
-			}
-			return ctrl.Result{}, err
+	// Get the Deployment.
+	deploy := &appsv1.Deployment{}
+	err = r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "racecourse"}, deploy)
+	if err != nil {
+		if apierrors.IsNotFound(err) {
+			return ctrl.Result{Requeue: true}, r.createRaceDeployment(*raceObj)
 		}
-		// Reconcile Service
-		r.reconcileRaceCourseService()
+		return ctrl.Result{}, err
+	}
 
-		raceObj.Status.DeploymentStatus = "Waiting"
-		err = r.Status().Update(ctx, raceObj)
+	if (deploy.Status.Replicas == deploy.Status.ReadyReplicas) && deploy.Status.UnavailableReplicas == 0 && (raceObj.Status.Replicas == raceObj.Spec.Replicas) {
+		raceObj.Status.DeploymentStatus = DeploymentStatusTrue
+		return ctrl.Result{}, r.Status().Update(context.Background(), raceObj)
+	}
+	// Reconcile the Deployment.
+	if raceObj.Status.Replicas != raceObj.Spec.Replicas {
+		err = r.PatchRaceDeployment(*deploy, *raceObj)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Get the Deployment.
-	deploy := &appsv1.Deployment{}
-	err = r.Get(ctx, types.NamespacedName{Namespace: namespace, Name: "racecourse"}, deploy)
-	if err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Check the status of the deployment.
-	if (deploy.Status.Replicas == deploy.Status.ReadyReplicas) && deploy.Status.UnavailableReplicas == 0 {
-		raceObj.Status.DeploymentStatus = "True"
-		return ctrl.Result{Requeue: false}, r.Status().Update(ctx, raceObj)
-	}
-
 	return ctrl.Result{Requeue: true}, nil
+
+}
+
+func (r *RacecourseReconciler) createRaceDeployment(rcourse v1alpha1.Racecourse) error {
+	deploy := buildRaceDeploymentObject(rcourse)
+
+	if err := r.Create(context.Background(), &deploy); err != nil {
+		return err
+	}
+
+	rcourse.Status.Replicas = rcourse.Spec.Replicas
+	rcourse.Status.DeploymentStatus = DeploymentStatusWaiting
+
+	return r.Status().Update(context.Background(), &rcourse)
 
 }
 func (r *RacecourseReconciler) reconcileRaceCourseService() {
@@ -127,9 +136,28 @@ func (r *RacecourseReconciler) reconcileRaceCourseService() {
 	r.Create(context.Background(), service)
 }
 
-func (r *RacecourseReconciler) reconcileRaceCourseDeployment(rcourse v1alpha1.Racecourse) error {
+func (r *RacecourseReconciler) PatchRaceDeployment(deploy appsv1.Deployment, rcourse v1alpha1.Racecourse) error {
+	patchDeploy := buildRaceDeploymentObject(rcourse)
+
+	err := r.Patch(context.Background(), &patchDeploy, client.StrategicMergeFrom(&deploy), &client.PatchOptions{})
+	if err != nil {
+		return err
+	}
+	rcourse.Status.Replicas = rcourse.Spec.Replicas
+	rcourse.Status.DeploymentStatus = DeploymentStatusWaiting
+	return r.Status().Update(context.Background(), &rcourse)
+}
+
+// SetupWithManager sets up the controller with the Manager.
+func (r *RacecourseReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	return ctrl.NewControllerManagedBy(mgr).
+		For(&kaleidov1alpha1.Racecourse{}).
+		Complete(r)
+}
+
+func buildRaceDeploymentObject(rcourse v1alpha1.Racecourse) appsv1.Deployment {
 	replicasNum := int32(rcourse.Spec.Replicas)
-	deploy := appsv1.Deployment{
+	return appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "racecourse",
 			Namespace: namespace,
@@ -162,12 +190,4 @@ func (r *RacecourseReconciler) reconcileRaceCourseDeployment(rcourse v1alpha1.Ra
 		},
 	}
 
-	return r.Client.Create(context.Background(), &deploy)
-}
-
-// SetupWithManager sets up the controller with the Manager.
-func (r *RacecourseReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&kaleidov1alpha1.Racecourse{}).
-		Complete(r)
 }
